@@ -24,7 +24,36 @@ static void runBench(Sim& s){
         float ms = 0.0f;
         CUDA_CHECK(cudaEventElapsedTime(&ms, t0, t1));
         totalMs += ms;
+        CUDA_CHECK(cudaMemcpy(hp.data(), s.pos, s.N * sizeof(float3),
+                              cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(hid.data(), s.fishId, s.N * sizeof(int),
+                              cudaMemcpyDeviceToHost));
+        for(int k = 0; k < s.N; k++){
+            float3 p = hp[k];
+            lo.x = fminf(lo.x, p.x); hi.x = fmaxf(hi.x, p.x);
+            lo.y = fminf(lo.y, p.y); hi.y = fmaxf(hi.y, p.y);
+            lo.z = fminf(lo.z, p.z); hi.z = fmaxf(hi.z, p.z);
+            int id = hid[k];
+            if(id < 0 || id >= s.N){
+                std::printf("bad fishId %d in slot %d\n", id, k);
+                std::exit(1);
+            }
+            if(f > 0){
+                maxStep = fmaxf(maxStep, length(p - last[id]));
+            }
+            last[id] = p;
+        }
     }
+    std::printf("sim %.3f ms/frame (avg of %d)\n", totalMs / FRAMES, FRAMES);
+    std::printf("x  %6.2f .. %6.2f   seeded %.0f .. %.0f\n",
+                lo.x, hi.x, WALL_M, s.tank.x - WALL_M);
+    std::printf("y  %6.2f .. %6.2f   seeded %.0f .. %.0f\n",
+                lo.y, hi.y, WALL_MY, s.tank.y - WALL_MY);
+    std::printf("z  %6.2f .. %6.2f   seeded %.0f .. %.0f\n",
+                lo.z, hi.z, WALL_M, s.tank.z - WALL_M);
+    std::printf("max step %.4f   limit %.4f (SPEED * dt)\n", maxStep, SPEED * dt);
+    CUDA_CHECK(cudaEventDestroy(t0));
+    CUDA_CHECK(cudaEventDestroy(t1));
 }
 
 int main(int argc, char** argv){
@@ -58,6 +87,12 @@ int main(int argc, char** argv){
     simStep(s, 1.0f / 60.0f);    //temp
     CUDA_CHECK(cudaDeviceSynchronize());//temp
     std::printf("one step ok, bench %d\n", (int)bench); //temp
+    if(bench){
+        runBench(s);
+    }
+    else{
+        std::printf("no window yet (Step 2). Run with --bench.\n");
+    }
     simFree(s);
     return 0;
 }
