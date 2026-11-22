@@ -26,3 +26,18 @@ __global__ void k_assign(const float3* pos, int* cellId, int* perm, int N, int3 
     cellId[i] = cellIndex(cx, cy, cz, grid);
     perm[i] = i;
 }
+
+__global__ void k_bounds(const int* cellId, int* cellStart, int* cellEnd, int N){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i >= N){
+        return;
+    }
+
+    int c = cellId[i];
+    if(i == 0 || cellId[i - 1] != c){
+        cellStart[c] = i;
+    }
+    if(i == N || cellId[i + 1] != c){
+        cellEnd[c] = i + 1;
+    }
+}
