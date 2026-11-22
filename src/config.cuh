@@ -36,3 +36,4 @@ constexpr float MAX_CLIMB = 0.5f;   // steepest climb: vertical / horizontal spe
 constexpr float WALL_M    = 20.0f;  // soft wall margin on x and z (2 L)
 constexpr float WALL_MY   = 8.0f;   // soft wall margin on y (the pond is shallow)
 constexpr float WALL_W    = 35.0f;  // soft wall push right at the wall
+constexpr int   DEFAULT_FISH = 64;  // --fish N overrides it
