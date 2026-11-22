@@ -83,5 +83,23 @@ static void simFree(Sim& s){
     cudaFree(s.perm);
     cudaFree(s.cellStart);
     cudaFree(s.cellEnd);
+}
 
+static void simStep(Sim& s, float dt){
+    const int TPB = 256;                      //threads per block
+    int blocks = (s.N + TPB - 1) / TPB;       //round up; enough blocks for N fish
+    k_assign<<<blocks, TPB>>>(s.pos, s.cellId, s.perm, s.N, s.grid, s.cellSize);
+    thrust::sort_by_key(thrust::device, s.cellId, s.cellId + s.N, s.perm);
+    CUDA_CHECK(cudaMemset(s.cellStart, -1, (size_t)s.nCells * sizeof(int)));
+    k_bounds<<<blocks, TPB>>>(s.cellId, s.cellStart, s.cellEnd, s.N);
+
+    k_reorder<<<blocks, TPB>>>(s.pos, s.vel, s.fishId, s.perm,
+                               s.posSort, s.velSort, s.idSort, s.N);
+    // Reads only the *sort copies, so writing pos/vel in place is race-free.
+    k_boids<<<blocks, TPB>>>(s.posSort, s.velSort, s.idSort, s.pos, s.vel,
+                             s.cellStart, s.cellEnd,
+                             s.N, dt, s.time, s.tank, s.grid, s.cellSize);
+    std::swap(s.fishId, s.idSort);
+    s.time += dt;
+    CUDA_CHECK(cudaGetLastError());
 }
