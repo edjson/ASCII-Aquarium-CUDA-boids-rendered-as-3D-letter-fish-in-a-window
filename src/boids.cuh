@@ -83,3 +83,18 @@ __device__ inline void reflect(float& p, float& v, float hi){
     }
     p = fminf(fmaxf(p, 0.0f), hi);
 }
+
+__global__ void k_boids(const float3* posIn, const float3* velIn, const int* fishId,
+    float3* posOut, float3* velOut, const int* cellStart, const int* cellEnd,
+    int N, float dt, float time, float3 tank, int3 grid, float cellSize){
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        if(i >= N){
+            return;
+        }
+        float3 p = posIn[i], v = velIn[i];
+        float3 sep = {0, 0, 0}, ali = {0, 0, 0}, coh = {0, 0, 0};
+        int n = 0;
+
+        int cx = cellOf(p.x, cellSize, grid.x);
+        int cy = cellOf(p.y, cellSize, grid.y);
+        int cz = cellOf(p.z, cellSize, grid.z);
