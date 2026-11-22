@@ -98,3 +98,91 @@ __global__ void k_boids(const float3* posIn, const float3* velIn, const int* fis
         int cx = cellOf(p.x, cellSize, grid.x);
         int cy = cellOf(p.y, cellSize, grid.y);
         int cz = cellOf(p.z, cellSize, grid.z);
+
+        for(int oz = -1; oz <= 1; oz++){                 // 3x3x3 neighbor cells
+            for(int oy = -1; oy <= 1; oy++){
+                for(int ox = -1; ox <= 1; ox++){
+                    int nx = cx + ox, ny = cy + oy, nz = cz + oz;
+                    if(nx < 0 || ny < 0 || nz < 0 ||
+                       nx >= grid.x || ny >= grid.y || nz >= grid.z){
+                        continue;                        // cell is off the edge
+                    }
+
+                    int c = cellIndex(nx, ny, nz, grid);
+                    int s = cellStart[c];
+                    if(s < 0){
+                        continue;                        // empty cell
+                    }
+
+                    for(int j = s, e = cellEnd[c]; j < e; j++){
+                        if(j == i){
+                            continue;                    // skip myself
+                        }
+                        float3 d = posIn[j] - p;
+                        float d2 = dot(d, d);
+                        if(d2 > (VIEW_R * VIEW_R)){
+                            continue;                    // too far to see
+                        }
+
+                        if(d2 < (SEP_R * SEP_R)){        // push away: 1 when touching, 0 at SEP_R
+                            sep -= d * (rsqrtf(fmaxf(d2, 1e-4f)) - (1.0f / SEP_R));
+                        }
+                        ali += velIn[j];
+                        coh += posIn[j];
+                        n++;
+                    }
+                }
+            }
+        }
+        // Steering: what the koi wants
+        float3 acc = sep * SEP_W;
+        if(n > 0){
+            float inv = 1.0f / n;
+            acc += ((((ali * inv) - v) * ALI_W) +            // match the average heading
+                    (((coh * inv) - p) * COH_W)); 
+        }
+
+        // Wander: each koi's own slow nudge
+
+        float id = (float)fishId[i];
+        acc.x += WANDER_W * sinf((time * 0.22f) + (id * 2.4f));
+        acc.y += 0.5f * sinf((time * 0.17f) + (id * 1.7f));   // optional: slow depth drift
+        acc.z += WANDER_W * sinf((time * 0.31f) + (id * 4.4f));
+        
+        //cap steering: smooth turns
+        float a = length(acc);
+        if(a > MAX_FORCE){
+            acc = acc * (MAX_FORCE / a);
+        }
+
+        // Not steering, so not capped; the walls always win
+
+        acc.x += wallPush(p.x, tank.x, WALL_M);
+        acc.y += wallPush(p.y, tank.y, WALL_MY);
+        acc.z += wallPush(p.z, tank.z, WALL_M);
+
+        // Cruise: ease back to level swimming at CRUISE speed
+        float h = sqrtf((v.x * v.x) + (v.z * v.z));
+        float3 goal = make_float3(v.x, 0.0f, v.z) * (CRUISE / fmaxf(h, 1e-4f));
+        acc += (goal - v) * CRUISE_W; 
+
+        //Move: integrate, limit the climb angle, clamp the speed
+        v += acc * dt;
+        h = sqrtf((v.x * v.x) + (v.z * v.z));
+        v.y = fminf(fmaxf(v.y, -MAX_CLIMB * h), MAX_CLIMB * h);
+        float sp = length(v);
+        if(sp < 1e-4f){
+            v = make_float3(MIN_SPEED, 0, 0);
+            sp = MIN_SPEED;
+        }
+        v = v * (fminf(fmaxf(sp, MIN_SPEED), SPEED) / sp);
+
+        p += v * dt;
+        reflect(p.x, v.x, tank.x);
+        reflect(p.y, v.y, tank.y);
+        reflect(p.z, v.z, tank.z);
+
+        posOut[i] = p;
+        velOut[i] = v;
+}
+        
