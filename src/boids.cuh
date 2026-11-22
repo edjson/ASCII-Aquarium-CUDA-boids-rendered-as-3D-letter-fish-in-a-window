@@ -41,3 +41,16 @@ __global__ void k_bounds(const int* cellId, int* cellStart, int* cellEnd, int N)
         cellEnd[c] = i + 1;
     }
 }
+
+__global__ void k_reorder(const float3* pos, const float3* vel, const int* fishId, const int* perm,
+    float3* posOut, float3* velOut, int* idOut, int N){
+    int k = blockIdx.x * blockDim.x + threadIdx.x;
+    if(k >= N){
+        return;
+    }
+
+    int j = perm[k];
+    posOut[k] = pos[j];
+    velOut[k] = vel[j];
+    idOut[k] = fishId[j];
+}
