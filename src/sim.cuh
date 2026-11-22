@@ -71,3 +71,17 @@ static void simSeed(Sim& s, unsigned seed){
     CUDA_CHECK(cudaMemcpy(s.fishId , hid.data(), s.N * sizeof(int), cudaMemcpyHostToDevice));
     s.time = 0.0f;
 }
+
+static void simFree(Sim& s){
+    cudaFree(s.pos);
+    cudaFree(s.vel);
+    cudaFree(s.posSort);
+    cudaFree(s.velSort);
+    cudaFree(s.fishId);
+    cudaFree(s.idSort);
+    cudaFree(s.cellId);
+    cudaFree(s.perm);
+    cudaFree(s.cellStart);
+    cudaFree(s.cellEnd);
+
+}
