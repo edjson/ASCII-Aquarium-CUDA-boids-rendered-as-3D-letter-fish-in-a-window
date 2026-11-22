@@ -37,7 +37,7 @@ __global__ void k_bounds(const int* cellId, int* cellStart, int* cellEnd, int N)
     if(i == 0 || cellId[i - 1] != c){
         cellStart[c] = i;
     }
-    if(i == N || cellId[i + 1] != c){
+    if(i == N -1 || cellId[i + 1] != c){
         cellEnd[c] = i + 1;
     }
 }
