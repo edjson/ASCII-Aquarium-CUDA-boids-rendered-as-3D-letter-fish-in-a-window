@@ -54,3 +54,32 @@ __global__ void k_reorder(const float3* pos, const float3* vel, const int* fishI
     velOut[k] = vel[j];
     idOut[k] = fishId[j];
 }
+
+//soft wall: inside the margin m, push back toward the middle, gorwing as t^2
+
+__device__ inline float wallPush(float p, float hi, float m){
+    float a = 0.0f;
+    if(p < m){
+        float t = 1.0f - (p / m);
+        a += (t * t);
+    }
+    if(p > (hi - m)){
+        float t = 1.0f - ((hi - p) / m);
+        a -= (t * t);
+    }
+    return(a * WALL_W);
+}
+
+// Hard wall, only a saftey net: mirror the pisiont point velcity inward.
+
+__device__ inline void reflect(float& p, float& v, float hi){
+    if(p < 0.0f){
+        p = -p;
+        v = fabsf(v);
+    }
+    if(p > hi){
+        p = (2.0f * hi) - p;
+        v = -fabsf(v);
+    }
+    p = fminf(fmaxf(p, 0.0f), hi);
+}
