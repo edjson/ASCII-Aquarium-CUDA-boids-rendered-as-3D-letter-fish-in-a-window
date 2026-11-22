@@ -83,10 +83,6 @@ int main(int argc, char** argv){
     std::printf("%d fish, tank %.0fx%.0fx%.0f, grid %dx%dx%d = %d cells\n",
                 s.N, s.tank.x, s.tank.y, s.tank.z,
                 s.grid.x, s.grid.y, s.grid.z, s.nCells);
-
-    simStep(s, 1.0f / 60.0f);    //temp
-    CUDA_CHECK(cudaDeviceSynchronize());//temp
-    std::printf("one step ok, bench %d\n", (int)bench); //temp
     if(bench){
         runBench(s);
     }
