@@ -8,7 +8,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_executable(koi src/main.cu)
+add_executable(koi src/main.cu src/sort.cu)
 target_compile_options(koi PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo> -Wall -Wextra)
 
 # SDL2 opens the window; SDL2_image write the png screenshots

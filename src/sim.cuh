@@ -1,10 +1,10 @@
 #pragma once
 #include "boids.cuh"
-#include <thrust/sort.h>
-#include <thrust/execution_policy.h>
 #include <random>
 #include <utility>
 #include <vector>
+
+void sortByCell(int* cellId, int* perm, int N); // in sort.cu  
 
 struct Sim {
     int     N;
@@ -89,7 +89,7 @@ static void simStep(Sim& s, float dt){
     const int TPB = 256;                      //threads per block
     int blocks = (s.N + TPB - 1) / TPB;       //round up; enough blocks for N fish
     k_assign<<<blocks, TPB>>>(s.pos, s.cellId, s.perm, s.N, s.grid, s.cellSize);
-    thrust::sort_by_key(thrust::device, s.cellId, s.cellId + s.N, s.perm);
+    sortByCell(s.cellId, s.perm, s.N);
     CUDA_CHECK(cudaMemset(s.cellStart, -1, (size_t)s.nCells * sizeof(int)));
     k_bounds<<<blocks, TPB>>>(s.cellId, s.cellStart, s.cellEnd, s.N);
 

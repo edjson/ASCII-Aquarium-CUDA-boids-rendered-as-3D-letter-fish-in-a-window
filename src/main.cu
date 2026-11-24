@@ -1,5 +1,6 @@
 #include "sim.cuh"
 #include <cstring>
+#include "screen.cuh"
 
 // 500 headless frames: time the sim, see how much of the pond is used,
 // and follow every fish by its id.
