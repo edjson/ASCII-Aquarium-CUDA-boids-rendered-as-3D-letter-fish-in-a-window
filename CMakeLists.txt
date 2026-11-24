@@ -10,3 +10,9 @@ endif()
 
 add_executable(koi src/main.cu)
 target_compile_options(koi PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo> -Wall -Wextra)
+
+# SDL2 opens the window; SDL2_image write the png screenshots
+
+find_package(SDL2 REQUIRED)
+find_package(SDL2_image REQUIRED)
+target_link_libraries(koi PRIVATE SDL2::SDL2 SDL2_image::SDL2_image)
