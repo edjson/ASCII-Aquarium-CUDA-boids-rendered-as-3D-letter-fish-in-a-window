@@ -67,8 +67,12 @@ static void runWindow(Sim& s, int W, int H){
     const float dt = 1.0f / 60.0f;             // one bench per frame 60 fps
     Uint64 hz = SDL_GetPerformanceFrequency(); // counter ticks per secound
     Uint64 due = SDL_GetPerformanceCounter(); // when the next frame is due
+    Uint64 tFps = due;      // when the fps count started
+    int frames = 0;         // frames since tFps
+    double workMs = 0.0;   // time spent working (not sleeping) since tFps
 
     while (!ui.quit){
+        Uint64 t0 = SDL_GetPerformanceCounter();
         pollEvents(ui);
         if(ui.reseed){
             simSeed(s, ui.seed);
@@ -96,9 +100,22 @@ static void runWindow(Sim& s, int W, int H){
         else{
             due = now;
         }
+        // once a second: put fps and work time in the title bar
+        workMs += (now - t0) * 1000.0 / hz;
+        frames++;
+        double sec = (now - tFps) / (double)hz;
+        if(sec >= 1.0){
+            char title[96];
+            std::snprintf(title, sizeof title, "koi  %d fish  seed %u  %.0f fps  %.2f ms%s",
+                          s.N, ui.seed, frames / sec, workMs / frames, ui.paused ? "  paused" : "");
+            SDL_SetWindowTitle(win.win, title);
+            frames = 0;
+            workMs = 0.0;
+            tFps = now;
+        }  
     }
     screenFree(scr);
-    winClose(win);
+    winClose(win);  
 }
 
 int main(int argc, char** argv){
