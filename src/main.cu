@@ -1,6 +1,7 @@
 #include "sim.cuh"
 #include <cstring>
 #include "screen.cuh"
+#include "window.cuh"
 
 // 500 headless frames: time the sim, see how much of the pond is used,
 // and follow every fish by its id.
@@ -59,6 +60,7 @@ static void runBench(Sim& s){
 
 int main(int argc, char** argv){
     int nFish = DEFAULT_FISH;
+    int W = 1280, H = 960;                          // --size WxH
     bool bench = false;
 
     for(int i = 1; i < argc; i++){
@@ -67,6 +69,10 @@ int main(int argc, char** argv){
         }
         else if(!std::strcmp(argv[i], "--fish")&& i + 1 < argc){
             nFish = std::atoi(argv[++i]);
+        }
+        else if(!std::strcmp(argv[i], "--size") && i + 1 < argc &&
+                std::sscanf(argv[i + 1], "%dx%d", &W, &H) == 2 && W >= 64 && H >= 64){
+                i++;
         }
         else{
             std::printf("usage: %s [--fish N] [--bench]\n", argv[0]);
