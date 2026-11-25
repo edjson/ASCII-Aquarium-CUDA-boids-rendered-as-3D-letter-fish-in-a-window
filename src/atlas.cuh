@@ -28,3 +28,33 @@ static std::vector<unsigned char> atlasBake(){
     TTF_Quit();
     return a;
 }
+
+// --atlas: every glyph as text, 8 per band (" .:#" = 4 levels of coverage),
+// then each glyph's ink: the sum of its coverage bytes.
+static void atlasPrint(const std::vector<unsigned char>& a){
+    const char* shade = " .:#";
+    for(int band = 0; band < NGLYPH / 8; band++){
+        for(int g = band * 8; g < band * 8 + 8; g++){
+            std::printf("  '%c'   |", GLYPHS[g]);
+        }
+        std::printf("\n");
+        for(int y = 0; y < CH; y++){
+            for(int g = band * 8; g < band * 8 + 8; g++){
+                for(int x = 0; x < CW; x++){
+                    std::putchar(shade[a[(g * CH + y) * CW + x] / 64]);
+                }
+                std::putchar('|');
+            }
+            std::putchar('\n');
+        }
+    }
+    std::printf("ink:");
+    for(int g = 0; g < NGLYPH; g++){
+        int sum = 0;
+        for(int i = 0; i < CH * CW; i++){
+            sum += a[g * CH * CW + i];
+        }
+        std::printf(" %d", sum);
+    }
+    std::printf("\n");
+}
