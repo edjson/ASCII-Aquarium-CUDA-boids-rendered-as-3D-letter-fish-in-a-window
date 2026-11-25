@@ -3,6 +3,7 @@
 #include "screen.cuh"
 #include "window.cuh"
 #include "atlas.cuh"
+#include "model.cuh"
 
 // 500 headless frames: time the sim, see how much of the pond is used,
 // and follow every fish by its id.
@@ -75,6 +76,8 @@ static void runWindow(Sim& s, int W, int H){
 
     Screen scr = screenInit(W, H);
     std::printf("atlas %d glyphs of %dx%d px, %dx%d cells\n", NGLYPH, CW, CH, scr.cols, scr.rows);
+    std::vector<KoiPoint> points = modelBuild(72, 64);   // the koi, built once on the host
+    modelPrint(points);
     UI   ui;                       
     const float dt = 1.0f / 60.0f;             // one bench per frame 60 fps
     Uint64 hz = SDL_GetPerformanceFrequency(); // counter ticks per secound

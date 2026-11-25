@@ -34,7 +34,9 @@ HD float length(float3 a){
 }
 
 HD float3 cross(float3 a, float3 b){
-    return make_float3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+    return make_float3((a.y * b.z) - (a.z * b.y),     // x
+                       (a.z * b.x) - (a.x * b.z),     // y
+                       (a.x * b.y) - (a.y * b.x));    // z
 }
 
 HD float3 normalize(float3 a){

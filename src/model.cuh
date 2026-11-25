@@ -36,3 +36,42 @@ static float3 bodyAt(float u, float v){
     float a = 6.2831853f * v, r = bodyR(u);
     return make_float3((0.5f - u) * KOI_LEN, -cosf(a) * r * BODY_H, sinf(a) * r * BODY_W);
 }
+
+static float3 bodyNormal(float u, float v){
+    const float E = 0.002f; 
+    float3 du = bodyAt(u + E, v) - bodyAt(u - E, v);
+    float3 dv = bodyAt(u, v + E) - bodyAt(u, v - E);
+    return normalize(cross(dv, du));
+}
+
+// Build the koi once on the host: a few loops over the profile functions.
+// The body gets rings x around points; the fins have fixed counts.
+static std::vector<KoiPoint> modelBuild(int rings, int around){
+    std::vector<KoiPoint> m;
+    
+    // Body: rings along the axis, around points on each ring.
+    for(int i = 0; i < rings; i++){
+        for(int j = 0; j < around; j++){
+            float u = U_STEM * (i + 0.5f) / rings, v = (j + 0.05f) / around;
+            m.push_back(KoiPoint{bodyAt(u, v), bodyNormal(u, v), u, v, P_BODY});
+        }
+    }
+    return m;
+}
+
+// Counts and bounds: compare these digits with the l lesson's 
+static void modelPrint(const std::vector<KoiPoint>& m){
+    int count[NPART] = {};
+    float3 lo = m[0].p, hi = m[0].p;
+    for(const KoiPoint& k : m){
+        count[k.part]++;
+        lo.x = fminf(lo.x, k.p.x); hi.x = fmaxf(hi.x, k.p.x);
+        lo.y = fminf(lo.y, k.p.y); hi.y = fmaxf(hi.y, k.p.y);
+        lo.z = fminf(lo.z, k.p.z); hi.z = fmaxf(hi.z, k.p.z);
+    }
+    std::printf("koi: %zu points (body %d, tail %d, dorsal %d, pectoral %d, eye %d, barbel %d)\n",
+                m.size(), count[P_BODY], count[P_TAIL], count[P_DORSAL], count[P_PEC], count[P_EYE],
+                count[P_BARBEL]);
+        std::printf("x %.2f .. %.2f   y %.2f .. %.2f   z %.2f .. %.2f\n",
+                lo.x, hi.x, lo.y, hi.y, lo.z, hi.z);
+}
