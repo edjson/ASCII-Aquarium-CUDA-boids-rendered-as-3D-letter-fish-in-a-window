@@ -79,6 +79,8 @@ static void runWindow(Sim& s, int W, int H){
     std::vector<KoiPoint> points = modelBuild(72, 64);   // the koi, built once on the host
     modelPrint(points);
     Model koi = modelUpload(points);
+    Patterns pat = patternInit(6);  //temp
+    patternSeed(pat, 6, 1u);
     UI   ui;                       
     const float dt = 1.0f / 60.0f;             // one bench per frame 60 fps
     Uint64 hz = SDL_GetPerformanceFrequency(); // counter ticks per secound
@@ -92,6 +94,7 @@ static void runWindow(Sim& s, int W, int H){
         pollEvents(ui);
         if(ui.reseed){
             simSeed(s, ui.seed);
+            patternSeed(pat, 6, ui.seed);
             ui.reseed = false;
         }
         if(!ui.paused){
@@ -134,6 +137,7 @@ static void runWindow(Sim& s, int W, int H){
     screenFree(scr);
     cudaFree(atlas);
     cudaFree(koi.pts);
+    patternFree(pat);
     winClose(win);  
 }
 

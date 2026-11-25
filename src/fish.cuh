@@ -1,6 +1,6 @@
 #pragma once
 #include "screen.cuh"
-#include "model.cuh"
+#include "pattern.cuh"
 
 // The camera: where it stands and its three axes, each of length 1. zoom is
 // the scale in pixels per world unit. light points from the scene toward the
