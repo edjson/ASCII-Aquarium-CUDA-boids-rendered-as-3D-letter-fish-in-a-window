@@ -37,3 +37,14 @@ constexpr float WALL_M    = 20.0f;  // soft wall margin on x and z (2 L)
 constexpr float WALL_MY   = 8.0f;   // soft wall margin on y (the pond is shallow)
 constexpr float WALL_W    = 35.0f;  // soft wall push right at the wall
 constexpr int   DEFAULT_FISH = 64;  // --fish N overrides it
+// Character cells. DejaVu Sans Mono at 13 pt draws each glyph below in an
+// 8 x 16 box whose rows 0 and 1 are always empty, so a cell keeps rows 2-15.
+constexpr int  CW = 8, CH = 14;              // cell width and height in pixels
+constexpr int  FONT_PT = 13, FONT_Y0 = 2;    // font size (1 pt = 1 px), first row kept
+constexpr char FONT_FILE[] = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf";
+
+// Atlas order. 0-9: brightness ramp, darkest to brightest by measured ink.
+// 10-14: edges / | \ - _ ('-' is in both sets). 15: bubble.
+constexpr char GLYPHS[] = " .-:*+=%#@/|\\-_o";
+constexpr int  NGLYPH = 16, NRAMP = 10, G_EDGE = 10, G_BUBBLE = 15;
+static_assert(sizeof(GLYPHS) == NGLYPH + 1, "one character per glyph");

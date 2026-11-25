@@ -15,4 +15,5 @@ target_compile_options(koi PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo> -Wall -
 
 find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
-target_link_libraries(koi PRIVATE SDL2::SDL2 SDL2_image::SDL2_image)
+find_package(SDL2_ttf REQUIRED)            # SDL2_ttf draws the letters once, at startup
+target_link_libraries(koi PRIVATE SDL2::SDL2 SDL2_image::SDL2_image SDL2_ttf::SDL2_ttf)
