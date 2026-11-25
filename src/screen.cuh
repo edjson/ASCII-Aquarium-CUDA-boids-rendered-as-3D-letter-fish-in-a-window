@@ -61,3 +61,23 @@ __global__ void k_gradient(Screen sc, float t){
                     0.5f + 0.5f * sinf(2.0f * t));
     sc.fb[y * sc.W + x] = rgba(c);
 }
+
+// TEMP draw evey fish as a white 5x5 dow seen form above
+
+__global__ void k_dots(Screen sc, const float3* pos, int N, float3 tank){
+    int i  = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i >= N){
+        return;
+    }
+
+    int px = (int)(pos[i].x / tank.x * (sc.W - 1));
+    int py = (int)(pos[i].z / tank.z * (sc.H - 1));
+    for(int dy = -2; dy <= 2; dy++){
+        for(int dx = -2; dx <= 2; dx++){
+            int x = px + dx, y = py + dy;
+            if(x >= 0 && x < sc.W && y >= 0 && y < sc.H){
+                sc.fb[y * sc.W + x] = make_uchar4(255, 255, 255, 255);
+            }
+        }
+    }
+}

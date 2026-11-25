@@ -78,6 +78,7 @@ static void runWindow(Sim& s, int W, int H){
             simStep(s, dt);
         }
         k_gradient<<<blocksFor(W, H), TILE>>>(scr, s.time);
+        k_dots<<<(s.N + 255) / 256, 256>>>(scr, s.pos, s.N, s.tank);
         CUDA_CHECK(cudaGetLastError());
         screenDownload(scr); //waits for GPU
         winShow(win, scr);
