@@ -79,3 +79,20 @@ static void pollEvents(UI& ui){
         }
     }
 }
+
+// S key: save the frame on screen as shotNNN.png in the current folder.
+static void winSave(const Screen& sc, int n){
+    char name[32];
+    std::snprintf(name, sizeof name, "shot%03d.png", n);
+    SDL_Surface* img = SDL_CreateRGBSurfaceWithFormatFrom(
+        sc.host, sc.W, sc.H, 32, sc.W * (int)sizeof(uchar4), SDL_PIXELFORMAT_RGBA32);
+    SDL_CHECK(img);
+    if(IMG_SavePNG(img, name) == 0){
+        uchar4 p = sc.host[sc.W - 1];
+        std::printf("saved %s, top right pixel %d %d %d %d\n", name, p.x, p.y, p.z, p.w);
+    }
+    else{
+        std::printf("screenshot failed: %s\n", SDL_GetError());
+    }
+    SDL_FreeSurface(img);
+}

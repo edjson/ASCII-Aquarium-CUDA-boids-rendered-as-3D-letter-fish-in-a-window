@@ -81,6 +81,10 @@ static void runWindow(Sim& s, int W, int H){
         k_dots<<<(s.N + 255) / 256, 256>>>(scr, s.pos, s.N, s.tank);
         CUDA_CHECK(cudaGetLastError());
         screenDownload(scr); //waits for GPU
+        if(ui.shot){
+            winSave(scr, ui.shots++);
+            ui.shot = false;
+        }
         winShow(win, scr);
 
         // 60 fps caps: sleep until the next frame is due, 1/60 s after the last one.
