@@ -60,22 +60,43 @@ __device__ inline uchar4 rgba(float3 c){
     return make_uchar4(u8(c.x), u8(c.y), u8(c.z), 255);
 }
 
-// TEMP test pattern (Step 3 replaces it): red grows to the right, green
-// grows downward, blue pulses with the sim clock.
-__global__ void k_gradient(Screen sc, float t){
+// TEMP test pattern every row shows the 16 glyphs in 
+// atllas order, scrolling left with the sim clock; red grows to the right,
+// green grows downward.
+
+__global__ void k_test_cells(Screen sc, int shift){
+    int cx = blockIdx.x * blockDim.x + threadIdx.x;
+    int cy = blockIdx.y * blockDim.y + threadIdx.y;
+    if(cx >= sc.cols || cy >= sc.rows){
+        return;
+    }
+    int c = cy * sc.cols + cx;
+    sc.glyph[c] = (unsigned char)((cx + shift) % NGLYPH);
+    sc.color[c] = make_float3(0.4f + 0.6f * cx / (sc.cols - 1),
+                              0.4f + 0.6f * cy / (sc.rows - 1), 0.6f);
+}
+
+// Cells to pixels, one thread per pixel; find the pixel's cell and its spot in
+// that cell, read the glyph's ink there. pixel = water + ink * cell color.
+
+__global__ void k_rasterize(Screen sc, const unsigned char* atlas){
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
+
     if(x >= sc.W || y >= sc.H){
         return;
     }
 
-    float3 c = make_float3((float)x / (sc.W - 1), (float)y / (sc.H - 1),
-                    0.5f + 0.5f * sinf(2.0f * t));
+    float3 c = make_float3(0.02f, 0.07f, 0.09f);    // dark green-blue water
+    int cx = x / CW, cy = y / CH;
+    if(cx < sc.cols && cy < sc.rows){
+        int cell = cy * sc.cols + cx;
+        int lx = x % CW, ly = y % CH;
+        float ink  = atlas[(sc.glyph[cell] * CH + ly) * CW + lx] / 255.0f;
+        c += sc.color[cell] * ink;
+    }
     sc.fb[y * sc.W + x] = rgba(c);
 }
-
-// TEMP draw evey fish as a white 5x5 dow seen form above
-
 __global__ void k_dots(Screen sc, const float3* pos, int N, float3 tank){
     int i  = blockIdx.x * blockDim.x + threadIdx.x;
     if(i >= N){

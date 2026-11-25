@@ -61,6 +61,14 @@ static void runBench(Sim& s){
 
 // the window: events, sim step, draw, copy to the host, show, 60 times a second.
 
+// Everything the GPU draws in one frame, in order. 
+static void drawFrame(const Screen& scr, const Sim& s, const unsigned char* atlas){
+    k_test_cells<<<blocksFor(scr.cols, scr.rows), TILE>>>(scr, (int)(s.time * 4.0f));
+    k_rasterize<<<blocksFor(scr.W, scr.H), TILE>>>(scr, atlas);
+    k_dots<<<(s.N + 255) / 256, 256>>>(scr, s.pos, s.N, s.tank);
+    CUDA_CHECK(cudaGetLastError());
+}
+
 static void runWindow(Sim& s, int W, int H){
     unsigned char* atlas = atlasUpload(atlasBake());
     Window win = winOpen(W, H);
@@ -85,9 +93,7 @@ static void runWindow(Sim& s, int W, int H){
         if(!ui.paused){
             simStep(s, dt);
         }
-        k_gradient<<<blocksFor(W, H), TILE>>>(scr, s.time);
-        k_dots<<<(s.N + 255) / 256, 256>>>(scr, s.pos, s.N, s.tank);
-        CUDA_CHECK(cudaGetLastError());
+        drawFrame(scr, s, atlas);
         screenDownload(scr); //waits for GPU
         if(ui.shot){
             winSave(scr, ui.shots++);
