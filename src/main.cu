@@ -58,6 +58,44 @@ static void runBench(Sim& s){
     CUDA_CHECK(cudaEventDestroy(t1));
 }
 
+// the window: events, sim step, draw, copy to the host, show, 60 times a second.
+
+static void runWindow(Sim& s, int W, int H){
+    Window win = winOpen(W, H);
+    Screen scr = screenInit(W, H);
+    UI   ui;                       
+    const float dt = 1.0f / 60.0f;             // one bench per frame 60 fps
+    Uint64 hz = SDL_GetPerformanceFrequency(); // counter ticks per secound
+    Uint64 due = SDL_GetPerformanceCounter(); // when the next frame is due
+
+    while (!ui.quit){
+        pollEvents(ui);
+        if(ui.reseed){
+            simSeed(s, ui.seed);
+            ui.reseed = false;
+        }
+        if(!ui.paused){
+            simStep(s, dt);
+        }
+        k_gradient<<<blocksFor(W, H), TILE>>>(scr, s.time);
+        CUDA_CHECK(cudaGetLastError());
+        screenDownload(scr); //waits for GPU
+        winShow(win, scr);
+
+        // 60 fps caps: sleep until the next frame is due, 1/60 s after the last one.
+        Uint64 now = SDL_GetPerformanceCounter();
+        due += hz / 60;
+        if(now < due){
+            SDL_Delay((Uint32)((due - now) * 1000 / hz));
+        }
+        else{
+            due = now;
+        }
+    }
+    screenFree(scr);
+    winClose(win);
+}
+
 int main(int argc, char** argv){
     int nFish = DEFAULT_FISH;
     int W = 1280, H = 960;                          // --size WxH
@@ -75,7 +113,7 @@ int main(int argc, char** argv){
                 i++;
         }
         else{
-            std::printf("usage: %s [--fish N] [--bench]\n", argv[0]);
+            std::printf("usage: %s [--fish N] [--bench] [--size WxH]\n", argv[0]);
             return 1;
         }
     }
@@ -94,7 +132,7 @@ int main(int argc, char** argv){
         runBench(s);
     }
     else{
-        std::printf("no window yet (Step 2). Run with --bench.\n");
+        runWindow(s, W, H);
     }
     simFree(s);
     return 0;
