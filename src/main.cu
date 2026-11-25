@@ -2,6 +2,7 @@
 #include <cstring>
 #include "screen.cuh"
 #include "window.cuh"
+#include "atlas.cuh"
 
 // 500 headless frames: time the sim, see how much of the pond is used,
 // and follow every fish by its id.
@@ -121,11 +122,14 @@ static void runWindow(Sim& s, int W, int H){
 int main(int argc, char** argv){
     int nFish = DEFAULT_FISH;
     int W = 1280, H = 960;                          // --size WxH
-    bool bench = false;
+    bool bench = false, showAtlas = false;
 
     for(int i = 1; i < argc; i++){
         if(!std::strcmp(argv[i], "--bench")){
             bench = true;
+        }
+        else if(!std::strcmp(argv[i], "--atlas")){
+            showAtlas = true;
         }
         else if(!std::strcmp(argv[i], "--fish")&& i + 1 < argc){
             nFish = std::atoi(argv[++i]);
@@ -135,11 +139,17 @@ int main(int argc, char** argv){
                 i++;
         }
         else{
-            std::printf("usage: %s [--fish N] [--bench] [--size WxH]\n", argv[0]);
+            std::printf("usage: %s [--fish N] [--bench] [--size WxH] [--atlas]\n", argv[0]);
             return 1;
         }
     }
-    if (nFish < 1) nFish =1;
+    if(nFish < 1){
+        nFish =1;
+    }
+    if(showAtlas){
+        atlasPrint(atlasBake());
+        return 0;
+    }
 
     cudaDeviceProp gpu;
     CUDA_CHECK(cudaGetDeviceProperties(&gpu, 0));
