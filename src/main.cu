@@ -62,8 +62,11 @@ static void runBench(Sim& s){
 // the window: events, sim step, draw, copy to the host, show, 60 times a second.
 
 static void runWindow(Sim& s, int W, int H){
+    unsigned char* atlas = atlasUpload(atlasBake());
     Window win = winOpen(W, H);
+
     Screen scr = screenInit(W, H);
+    std::printf("atlas %d glyphs of %dx%d px, %dx%d cells\n", NGLYPH, CW, CH, scr.cols, scr.rows);
     UI   ui;                       
     const float dt = 1.0f / 60.0f;             // one bench per frame 60 fps
     Uint64 hz = SDL_GetPerformanceFrequency(); // counter ticks per secound
@@ -116,6 +119,7 @@ static void runWindow(Sim& s, int W, int H){
         }  
     }
     screenFree(scr);
+    cudaFree(atlas);
     winClose(win);  
 }
 

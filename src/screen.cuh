@@ -9,6 +9,9 @@ struct Screen{
     int    W, H;   // pixels
     uchar4 *fb;     // device, W * H
     uchar4 *host;   // pinned host copy of fb
+    int cols, rows;
+    unsigned char *glyph;
+    float3 *color;
 };
 
 static Screen screenInit(int W, int H){
@@ -18,12 +21,21 @@ static Screen screenInit(int W, int H){
     size_t bytes = (size_t)W * H * sizeof(uchar4);
     CUDA_CHECK(cudaMalloc(&sc.fb, bytes));
     CUDA_CHECK(cudaMallocHost(&sc.host, bytes)); // pinned; faster copies
+    sc.cols = W / CW;                                 // whole cell only
+    sc.rows = H / CH;
+    size_t cells = (size_t)sc.cols * sc.rows;
+    CUDA_CHECK(cudaMalloc(&sc.glyph, cells));
+    CUDA_CHECK(cudaMalloc(&sc.color, cells * sizeof(float3)));
+    CUDA_CHECK(cudaMemset(sc.glyph, 0, cells));
+    CUDA_CHECK(cudaMemset(sc.color, 0, cells * sizeof(float3)));
     return sc;
 }
 
 static void screenFree(Screen& sc){
     cudaFree(sc.fb);
     cudaFreeHost(sc.host);
+    cudaFree(sc.glyph);
+    cudaFree(sc.color);
 }
 
 // Waits for the kernels, then copies the finsihed frame to the host.

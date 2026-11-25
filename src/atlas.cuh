@@ -58,3 +58,11 @@ static void atlasPrint(const std::vector<unsigned char>& a){
     }
     std::printf("\n");
 }
+
+// copy the atlas to the GPU once. 
+static unsigned char* atlasUpload(const std::vector<unsigned char>& a){
+    unsigned char* d = nullptr;
+    CUDA_CHECK(cudaMalloc(&d, a.size()));
+    CUDA_CHECK(cudaMemcpy(d, a.data(), a.size(), cudaMemcpyHostToDevice));
+    return d;
+}
