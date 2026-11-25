@@ -60,22 +60,6 @@ __device__ inline uchar4 rgba(float3 c){
     return make_uchar4(u8(c.x), u8(c.y), u8(c.z), 255);
 }
 
-// TEMP test pattern every row shows the 16 glyphs in 
-// atllas order, scrolling left with the sim clock; red grows to the right,
-// green grows downward.
-
-__global__ void k_test_cells(Screen sc, int shift){
-    int cx = blockIdx.x * blockDim.x + threadIdx.x;
-    int cy = blockIdx.y * blockDim.y + threadIdx.y;
-    if(cx >= sc.cols || cy >= sc.rows){
-        return;
-    }
-    int c = cy * sc.cols + cx;
-    sc.glyph[c] = (unsigned char)((cx + shift) % NGLYPH);
-    sc.color[c] = make_float3(0.4f + 0.6f * cx / (sc.cols - 1),
-                              0.4f + 0.6f * cy / (sc.rows - 1), 0.6f);
-}
-
 // Cells to pixels, one thread per pixel; find the pixel's cell and its spot in
 // that cell, read the glyph's ink there. pixel = water + ink * cell color.
 
@@ -96,21 +80,4 @@ __global__ void k_rasterize(Screen sc, const unsigned char* atlas){
         c += sc.color[cell] * ink;
     }
     sc.fb[y * sc.W + x] = rgba(c);
-}
-__global__ void k_dots(Screen sc, const float3* pos, int N, float3 tank){
-    int i  = blockIdx.x * blockDim.x + threadIdx.x;
-    if(i >= N){
-        return;
-    }
-
-    int px = (int)(pos[i].x / tank.x * (sc.W - 1));
-    int py = (int)(pos[i].z / tank.z * (sc.H - 1));
-    for(int dy = -2; dy <= 2; dy++){
-        for(int dx = -2; dx <= 2; dx++){
-            int x = px + dx, y = py + dy;
-            if(x >= 0 && x < sc.W && y >= 0 && y < sc.H){
-                sc.fb[y * sc.W + x] = make_uchar4(255, 255, 255, 255);
-            }
-        }
-    }
 }

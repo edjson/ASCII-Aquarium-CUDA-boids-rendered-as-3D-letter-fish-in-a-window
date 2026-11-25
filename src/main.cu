@@ -3,7 +3,7 @@
 #include "screen.cuh"
 #include "window.cuh"
 #include "atlas.cuh"
-#include "model.cuh"
+#include "fish.cuh"
 
 // 500 headless frames: time the sim, see how much of the pond is used,
 // and follow every fish by its id.
@@ -63,10 +63,10 @@ static void runBench(Sim& s){
 // the window: events, sim step, draw, copy to the host, show, 60 times a second.
 
 // Everything the GPU draws in one frame, in order. 
-static void drawFrame(const Screen& scr, const Sim& s, const unsigned char* atlas){
-    k_test_cells<<<blocksFor(scr.cols, scr.rows), TILE>>>(scr, (int)(s.time * 4.0f));
+static void drawFrame(const Screen& scr, const Camera& cam, const Model& koi,
+                      const unsigned char* atlas){
+    k_gather_cells<<<blocksFor(scr.cols, scr.rows), TILE>>>(scr, cam, koi.pts, koi.n);
     k_rasterize<<<blocksFor(scr.W, scr.H), TILE>>>(scr, atlas);
-    k_dots<<<(s.N + 255) / 256, 256>>>(scr, s.pos, s.N, s.tank);
     CUDA_CHECK(cudaGetLastError());
 }
 
@@ -78,6 +78,7 @@ static void runWindow(Sim& s, int W, int H){
     std::printf("atlas %d glyphs of %dx%d px, %dx%d cells\n", NGLYPH, CW, CH, scr.cols, scr.rows);
     std::vector<KoiPoint> points = modelBuild(72, 64);   // the koi, built once on the host
     modelPrint(points);
+    Model koi = modelUpload(points);
     UI   ui;                       
     const float dt = 1.0f / 60.0f;             // one bench per frame 60 fps
     Uint64 hz = SDL_GetPerformanceFrequency(); // counter ticks per secound
@@ -96,7 +97,10 @@ static void runWindow(Sim& s, int W, int H){
         if(!ui.paused){
             simStep(s, dt);
         }
-        drawFrame(scr, s, atlas);
+        // TEMP 
+        Camera cam = camOrbit(make_float3(0.0f, 0.0f, 0.0f), 0.4f * s.time, 0.35f, 100.0f, 44.0f);
+        drawFrame(scr, cam, koi, atlas);
+
         screenDownload(scr); //waits for GPU
         if(ui.shot){
             winSave(scr, ui.shots++);
@@ -129,6 +133,7 @@ static void runWindow(Sim& s, int W, int H){
     }
     screenFree(scr);
     cudaFree(atlas);
+    cudaFree(koi.pts);
     winClose(win);  
 }
 
