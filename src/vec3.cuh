@@ -33,4 +33,11 @@ HD float length(float3 a){
     return sqrt(dot(a, a));
 }
 
+HD float3 cross(float3 a, float3 b){
+    return make_float3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+}
+
+HD float3 normalize(float3 a){
+    return(a * (1.0f / length(a)));
+}
 #undef HD

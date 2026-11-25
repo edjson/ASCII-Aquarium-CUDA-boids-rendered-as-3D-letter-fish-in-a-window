@@ -48,3 +48,12 @@ constexpr char FONT_FILE[] = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.tt
 constexpr char GLYPHS[] = " .-:*+=%#@/|\\-_o";
 constexpr int  NGLYPH = 16, NRAMP = 10, G_EDGE = 10, G_BUBBLE = 15;
 static_assert(sizeof(GLYPHS) == NGLYPH + 1, "one character per glyph");
+
+// The koi model, in the koi's own frame: +x toward the snout, +y up, +z to
+// its side. u runs along the body from the snout (0) to the tail tip (1).
+constexpr float KOI_LEN = 10.0f;    // snout to tail tip, world units
+constexpr float BODY_H  = 1.45f;    // half height at the shoulder: length / height = 3.45
+constexpr float BODY_W  = 1.25f;    // half width at the shoulder
+constexpr float U_SHO   = 0.30f;    // u of the shoulder, where the body is thickest
+constexpr float U_STEM  = 0.78f;    // u where the body ends and the tail fin starts
+constexpr float STEM_R  = 0.30f;    // radius of the tail stem, as a fraction of the shoulder's
