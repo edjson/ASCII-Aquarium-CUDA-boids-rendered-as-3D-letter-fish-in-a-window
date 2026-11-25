@@ -97,3 +97,36 @@ static void patternSeed(Patterns& p, int nFish, unsigned seed){
     CUDA_CHECK(cudaMemcpy(p.blob,  hb.data(), hb.size() * sizeof(float4), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(p.style, hs.data(), hs.size() * sizeof(int),    cudaMemcpyHostToDevice));
 }
+
+// Smooth noise from -1 to 1, two sine products: it makes a blob's edge ragged.
+__device__ inline float skinNoise(float u, float v, float s){
+    return (0.6f * sinf((47.0f * u) + s) * sinf((31.0f * v) + (1.7f * s)))
+         + (0.4f * sinf((113.0f * u) + (2.3f * s)) * sinf((71.0f * v) + (0.7f * s)));
+}
+
+// The pattern color of skin point m on koi id.
+__device__ inline int koiColor(const KoiPoint& m, Patterns pat, int id, unsigned seed){
+    int   style = pat.style[id];
+    int   kind = (style & 255), base = ((style >> 8) & 3), fin = ((style >> 16) & 3);
+    float s = 6.2831853f * hash01(((unsigned)id * 7919u) + seed);    // this koi's noise phase
+
+    if(m.part == P_EYE){
+        return C_BLACK;
+    }
+    if(m.part != P_BODY){                                          // fins: Show as has black streaks
+        return ((kind == K_SHOWA) && (cosf((18.85f * m.v) + s) > 0.25f)) ? C_BLACK : fin;
+    }
+    if(fabsf(m.v - 0.5f) > 0.36f){                                 // the belly stays light
+        return (base == C_BLACK) ? C_WHITE : base;
+    }
+    
+    float grow = 1.0f + (0.25f * skinNoise(m.u, m.v, s));          // radius x 0.75..1.25: ragged
+    for(int b = NBLOB - 1; b >= 0; b--){                           // the last blob lies on top
+        float4 q  = pat.blob[(id * NBLOB) + b];
+        float  du = m.u - q.x, dv = 0.6f * (m.v - q.y), r = q.z * grow;
+        if(((du * du) + (dv * dv)) < (r * r)){
+            return (int)q.w;
+        }
+    }
+    return base;
+}

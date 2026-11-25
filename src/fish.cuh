@@ -49,9 +49,18 @@ __device__ inline int rampGlyph(float shade){
     return min(max((int)(sqrtf(shade) * NRAMP), 1), NRAMP - 1);
 }
 
+// The four pattern colors, in the order of the C_ names: off-white, gold,
+// near-black (a dark blue-grey, so it shows on the dark water), red.
+__device__ inline float3 koiPaint(int color){
+    const float3 PAINT[4] = {make_float3(0.92f, 0.90f, 0.84f), make_float3(1.00f, 0.66f, 0.12f),
+                             make_float3(0.18f, 0.21f, 0.31f), make_float3(0.96f, 0.27f, 0.10f)};
+    return PAINT[color];
+}
+
 // Temp
 
-__global__ void k_gather_cells(Screen sc, Camera cam, const KoiPoint* model, int nPts){
+__global__ void k_gather_cells(Screen sc, Camera cam, const KoiPoint* model, int nPts,
+                               Patterns pat, unsigned seed){
     int cx = blockIdx.x * blockDim.x + threadIdx.x;
     int cy = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -60,26 +69,30 @@ __global__ void k_gather_cells(Screen sc, Camera cam, const KoiPoint* model, int
     }
 
     float best = 1e30f, shade = 0.0f;                    // the nearest depth so far, its brightness
-    for(int i = 0; i < nPts; i++){
-        KoiPoint m = model[i];
-        float3 P = m.p;                                  // the koi sits at the origin
-        int    px, py;                                   // the point's cell
-        float  z;                                        // and its depth
-        if(!toCell(sc, cam, P, px, py, z) || px != cx || py != cy){
-            continue;
-        }
+    int   col  = C_WHITE;                                // and its pattern color
+    for(int k = 0; k < 6; k++){                          // six koi: two columns of three
+        for(int i = 0; i < nPts; i++){
+            KoiPoint m = model[i];
+            float3 P = m.p + make_float3(((k % 2) ? 6.6f : -6.6f), 0.0f, 7.2f - (7.2f * (k / 2)));
+            int    px, py;                                   // the point's cell
+            float  z;                                        // and its depth
+            if(!toCell(sc, cam, P, px, py, z) || px != cx || py != cy){
+                continue;
+            }
 
-        float3 N = m.n;
-        if(dot(N, cam.fwd) > 0.0f){                      // it faces away: light its other side
-            N = N * -1.0f;
-        }
-        if(z < best){                                    // nearer than what the cell has so far
-            best  = z;
-            shade = 0.35f + 0.50f * fmaxf(dot(N, cam.light), 0.0f);
+            float3 N = m.n;
+            if(dot(N, cam.fwd) > 0.0f){                      // it faces away: light its other side
+                N = N * -1.0f;
+            }
+            if(z < best){                                    // nearer than what the cell has so far
+                best  = z;
+                shade = 0.35f + 0.50f * fmaxf(dot(N, cam.light), 0.0f);
+                col   = koiColor(m, pat, k, seed);
+            }
         }
     }
 
     int c = cy * sc.cols + cx;
     sc.glyph[c] = (unsigned char)(best < 1e30f ? rampGlyph(shade) : 0);
-    sc.color[c] = make_float3(0.92f, 0.90f, 0.84f) * shade;
+    sc.color[c] = koiPaint(col) * shade;
 }
