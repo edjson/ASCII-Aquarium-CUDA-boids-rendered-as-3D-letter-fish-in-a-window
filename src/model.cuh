@@ -13,6 +13,18 @@ struct KoiPoint{
     int part;
 };
 
+struct Model{
+    KoiPoint *pts;   //device, n points
+    int       n;
+};
+
+static Model modelUpload(const std::vector<KoiPoint>& m){
+    Model d{nullptr, (int)m.size()};
+    CUDA_CHECK(cudaMalloc(&d.pts, m.size() * sizeof(KoiPoint)));
+    CUDA_CHECK(cudaMemcpy(d.pts, m.data(), m.size() * sizeof(KoiPoint), cudaMemcpyHostToDevice));
+    return d;
+}
+
 enum{
      P_BODY, P_TAIL, P_DORSAL, P_PEC, P_EYE, P_BARBEL, NPART 
 };
@@ -119,6 +131,9 @@ static std::vector<KoiPoint> modelBuild(int rings, int around){
     }
     return m;
 }
+
+
+
 
 // Counts and bounds: compare these digits with the l lesson's 
 static void modelPrint(const std::vector<KoiPoint>& m){
