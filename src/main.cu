@@ -65,7 +65,10 @@ static void runBench(Sim& s){
 // Everything the GPU draws in one frame, in order. 
 static void drawFrame(const Screen& scr, const Camera& cam, const Model& koi,
                     const Patterns& pat, unsigned seed, const unsigned char* atlas){
-        k_gather_cells<<<blocksFor(scr.cols, scr.rows), TILE>>>(scr, cam, koi.pts, koi.n, pat, seed);
+    size_t cells = (size_t)scr.cols * scr.rows;          // every depth word to all ones: empty
+    CUDA_CHECK(cudaMemset(scr.depth, 0xFF, cells * sizeof(unsigned long long)));
+    k_draw_fish<<<dim3(6, (koi.n + 255) / 256), 256>>>(scr, cam, koi.pts, koi.n, pat, seed);
+    k_resolve_cells<<<blocksFor(scr.cols, scr.rows), TILE>>>(scr);
     k_rasterize<<<blocksFor(scr.W, scr.H), TILE>>>(scr, atlas);
     CUDA_CHECK(cudaGetLastError());
 }
@@ -81,6 +84,9 @@ static void runWindow(Sim& s, int W, int H){
     Model koi = modelUpload(points);
     Patterns pat = patternInit(6);  //temp
     patternSeed(pat, 6, 1u);
+    unsigned long long w = packCell(0x43030000u, 0.75f, 3, 2, 137);   // TEMP: check the layout
+    std::printf("cell %016llx: shade %.3f part %d color %d fish %d\n", w, cellShade(w), cellPart(w),
+                cellColor(w), cellFish(w));
     UI   ui;                       
     const float dt = 1.0f / 60.0f;             // one bench per frame 60 fps
     Uint64 hz = SDL_GetPerformanceFrequency(); // counter ticks per secound
@@ -192,3 +198,4 @@ int main(int argc, char** argv){
     simFree(s);
     return 0;
 }
+

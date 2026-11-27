@@ -12,7 +12,10 @@ struct Screen{
     int cols, rows;
     unsigned char *glyph;
     float3 *color;
+    unsigned long long *depth;       // device, cols * rows: the nearest point per cell
 };
+// A depth word of all ones is farther than any point can be: an empty cell.
+constexpr unsigned long long EMPTY = ~0ull;
 
 static Screen screenInit(int W, int H){
     Screen sc{};
@@ -26,6 +29,7 @@ static Screen screenInit(int W, int H){
     size_t cells = (size_t)sc.cols * sc.rows;
     CUDA_CHECK(cudaMalloc(&sc.glyph, cells));
     CUDA_CHECK(cudaMalloc(&sc.color, cells * sizeof(float3)));
+    CUDA_CHECK(cudaMalloc(&sc.depth, cells * sizeof(unsigned long long)));   // set every frame
     CUDA_CHECK(cudaMemset(sc.glyph, 0, cells));
     CUDA_CHECK(cudaMemset(sc.color, 0, cells * sizeof(float3)));
     return sc;
@@ -36,6 +40,7 @@ static void screenFree(Screen& sc){
     cudaFreeHost(sc.host);
     cudaFree(sc.glyph);
     cudaFree(sc.color);
+    cudaFree(sc.depth);
 }
 
 // Waits for the kernels, then copies the finsihed frame to the host.

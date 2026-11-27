@@ -57,42 +57,84 @@ __device__ inline float3 koiPaint(int color){
     return PAINT[color];
 }
 
-// Temp
+// One cell's depth word, 64 bits. The depth sits in the high half, so of two
+// words the smaller one is the nearer point. What that point looks like rides
+// along in the low half:
+//   bits 63..32  depth: the float's own bits (positive floats order like integers)
+//   bits 31..16  shade: 0..65535 stands for a brightness of 0..2
+//   bits 15..12  part     bits 11..8  pattern color     bits 7..0  fish id, its low 8 bits
+__host__ __device__ inline unsigned long long packCell(unsigned depthBits, float shade, int part,
+                                                       int color, int id){
+    unsigned lo = ((unsigned)(fminf(shade * 0.5f, 1.0f) * 65535.0f) << 16)
+                | ((unsigned)part << 12) | ((unsigned)color << 8) | ((unsigned)id & 255u);
+    return ((unsigned long long)depthBits << 32) | lo;
+}
 
-__global__ void k_gather_cells(Screen sc, Camera cam, const KoiPoint* model, int nPts,
-                               Patterns pat, unsigned seed){
-    int cx = blockIdx.x * blockDim.x + threadIdx.x;
-    int cy = blockIdx.y * blockDim.y + threadIdx.y;
 
+// The way back: one field of a depth word each. Only packCell and these four
+// know the layout.
+__host__ __device__ inline float cellShade(unsigned long long w){
+    return ((unsigned)w >> 16) * (2.0f / 65535.0f);
+}
+__host__ __device__ inline int cellPart(unsigned long long w){
+    return ((unsigned)w >> 12) & 15;
+}
+__host__ __device__ inline int cellColor(unsigned long long w){
+    return ((unsigned)w >> 8) & 15;
+}
+__host__ __device__ inline int cellFish(unsigned long long w){
+    return (unsigned)w & 255;
+}
+
+
+// One thread per model point per koi: block x is the koi's slot, block y and
+// thread x count the point. Move the point with its koi, find its cell, light
+// it, and offer it to the cell.
+__global__ void k_draw_fish(Screen sc, Camera cam, const KoiPoint* model, int nPts,
+                            Patterns pat, unsigned seed){
+    int k = blockIdx.x;                                  // this block's koi, by its slot
+    int i = (blockIdx.y * blockDim.x) + threadIdx.x;     // this thread's model point
+    if(i >= nPts){
+        return;
+    }
+    KoiPoint m  = model[i];
+    int      id = k;                                     // TEMP the six posed koi again
+    float3   P  = m.p + make_float3(((k % 2) ? 6.6f : -6.6f), 0.0f, 7.2f - (7.2f * (k / 2)));
+    float3   N  = m.n;
+
+    int   cx, cy;                                        // the point's cell
+    float z;                                             // and its depth
+    if(!toCell(sc, cam, P, cx, cy, z)){
+        return;
+    }
+
+    // Light: Lambert. A point that faces away shows its other side.
+    if(dot(N, cam.fwd) > 0.0f){
+        N = N * -1.0f;
+    }
+    float shade = 0.35f + (0.50f * fmaxf(dot(N, cam.light), 0.0f));
+
+    // Offer the point to its cell. The smallest word wins: the nearest point.
+    int col = koiColor(m, pat, id, seed);
+    unsigned long long w = packCell(__float_as_uint(z), shade, m.part, col, id);
+    atomicMin(&sc.depth[(cy * sc.cols) + cx], w);
+}
+
+__global__ void k_resolve_cells(Screen sc){
+    int cx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    int cy = (blockIdx.y * blockDim.y) + threadIdx.y;
     if(cx >= sc.cols || cy >= sc.rows){
         return;
     }
 
-    float best = 1e30f, shade = 0.0f;                    // the nearest depth so far, its brightness
-    int   col  = C_WHITE;                                // and its pattern color
-    for(int k = 0; k < 6; k++){                          // six koi: two columns of three
-        for(int i = 0; i < nPts; i++){
-            KoiPoint m = model[i];
-            float3 P = m.p + make_float3(((k % 2) ? 6.6f : -6.6f), 0.0f, 7.2f - (7.2f * (k / 2)));
-            int    px, py;                                   // the point's cell
-            float  z;                                        // and its depth
-            if(!toCell(sc, cam, P, px, py, z) || px != cx || py != cy){
-                continue;
-            }
-
-            float3 N = m.n;
-            if(dot(N, cam.fwd) > 0.0f){                      // it faces away: light its other side
-                N = N * -1.0f;
-            }
-            if(z < best){                                    // nearer than what the cell has so far
-                best  = z;
-                shade = 0.35f + 0.50f * fmaxf(dot(N, cam.light), 0.0f);
-                col   = koiColor(m, pat, k, seed);
-            }
-        }
+    int c = (cy * sc.cols) + cx;
+    unsigned long long w = sc.depth[c];
+    if(w == EMPTY){
+        sc.glyph[c] = 0;
+        sc.color[c] = make_float3(0.0f, 0.0f, 0.0f);
+        return;
     }
-
-    int c = cy * sc.cols + cx;
-    sc.glyph[c] = (unsigned char)(best < 1e30f ? rampGlyph(shade) : 0);
-    sc.color[c] = koiPaint(col) * shade;
+    float shade = cellShade(w);
+    sc.glyph[c] = (unsigned char)rampGlyph(shade);
+    sc.color[c] = koiPaint(cellColor(w)) * shade;
 }
