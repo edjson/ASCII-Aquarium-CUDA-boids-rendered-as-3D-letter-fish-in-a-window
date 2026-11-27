@@ -3,7 +3,7 @@
 #include "pattern.cuh"
 
 // The camera: where it stands and its three axes, each of length 1. zoom is
-// the scale in pixels per world unit. light points from the scene toward the
+// the scale in pixels per world unit at depth 1. light points toward the
 // light; it is fixed in the world and rides along, so a kernel that gets the
 // camera has the light too. Step 7b rebuilds the camera from the mouse.
 struct Camera{
@@ -32,8 +32,12 @@ static Camera camOrbit(float3 target, float yaw, float pitch, float dist, float 
 __device__ inline bool toCell(Screen sc, Camera cam, float3 P, int& cx, int& cy, float& z){
     float3 d = P - cam.eye;
     z = dot(d, cam.fwd);
-    float sx = sc.W * 0.5f + cam.zoom * dot(d, cam.right);   // pixel x
-    float sy = sc.H * 0.5f - cam.zoom * dot(d, cam.up);      // pixel y, growing downward
+      if(z < 1.0f){                                            // at the camera or behind it
+        return false;
+    }
+    float s  = cam.zoom / z;                                 // twice as far, half the size
+    float sx = (sc.W * 0.5f) + (s * dot(d, cam.right));      // pixel x
+    float sy = (sc.H * 0.5f) - (s * dot(d, cam.up));         // pixel y, growing downward
     if(sx < 0.0f || sy < 0.0f){                              // before the casts: (int) rounds to 0
         return false;
     }

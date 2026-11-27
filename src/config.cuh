@@ -57,3 +57,9 @@ constexpr float BODY_W  = 1.25f;    // half width at the shoulder
 constexpr float U_SHO   = 0.30f;    // u of the shoulder, where the body is thickest
 constexpr float U_STEM  = 0.78f;    // u where the body ends and the tail fin starts
 constexpr float STEM_R  = 0.30f;    // radius of the tail stem, as a fraction of the shoulder's
+
+// The camera. One lens for every view: CAM_FOV is the angle from the top of
+// the window to the bottom. The other two say where it stands over the pond.
+constexpr float CAM_FOV   = 0.5236f;    // 30 degrees
+constexpr float CAM_PITCH = 1.0472f;    // it looks down on the pond at 60 degrees
+constexpr float CAM_DIST  = 160.0f;     // from this far away, aimed at the pond's middle

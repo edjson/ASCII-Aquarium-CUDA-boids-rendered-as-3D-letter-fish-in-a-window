@@ -87,6 +87,7 @@ static void runWindow(Sim& s, int W, int H){
     unsigned long long w = packCell(0x43030000u, 0.75f, 3, 2, 137);   // TEMP: check the layout
     std::printf("cell %016llx: shade %.3f part %d color %d fish %d\n", w, cellShade(w), cellPart(w),
                 cellColor(w), cellFish(w));
+    const float zoom = (0.5f * H) / tanf(0.5f * CAM_FOV);   // the lens: pixels per unit at depth 1
     UI   ui;                       
     const float dt = 1.0f / 60.0f;             // one bench per frame 60 fps
     Uint64 hz = SDL_GetPerformanceFrequency(); // counter ticks per secound
@@ -108,7 +109,7 @@ static void runWindow(Sim& s, int W, int H){
         }
         // TEMP six koi around the origin, seen from above, rocking.
         float  pitch = 1.15f + (0.25f * sinf(0.5f * s.time));
-        Camera cam   = camOrbit(make_float3(0.0f, 0.0f, 0.0f), 0.0f, pitch, 100.0f, 44.0f);
+        Camera cam   = camOrbit(make_float3(0.0f, 0.0f, 0.0f), 0.0f, pitch, 45.0f, zoom);
         drawFrame(scr, cam, koi, pat, ui.seed, atlas);
 
         screenDownload(scr); //waits for GPU
