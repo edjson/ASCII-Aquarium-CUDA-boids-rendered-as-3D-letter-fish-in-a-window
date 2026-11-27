@@ -64,8 +64,8 @@ static void runBench(Sim& s){
 
 // Everything the GPU draws in one frame, in order. 
 static void drawFrame(const Screen& scr, const Camera& cam, const Model& koi,
-                      const unsigned char* atlas){
-    k_gather_cells<<<blocksFor(scr.cols, scr.rows), TILE>>>(scr, cam, koi.pts, koi.n);
+                    const Patterns& pat, unsigned seed, const unsigned char* atlas){
+        k_gather_cells<<<blocksFor(scr.cols, scr.rows), TILE>>>(scr, cam, koi.pts, koi.n, pat, seed);
     k_rasterize<<<blocksFor(scr.W, scr.H), TILE>>>(scr, atlas);
     CUDA_CHECK(cudaGetLastError());
 }
@@ -100,9 +100,10 @@ static void runWindow(Sim& s, int W, int H){
         if(!ui.paused){
             simStep(s, dt);
         }
-        // TEMP 
-        Camera cam = camOrbit(make_float3(0.0f, 0.0f, 0.0f), 0.4f * s.time, 0.35f, 100.0f, 44.0f);
-        drawFrame(scr, cam, koi, atlas);
+        // TEMP six koi around the origin, seen from above, rocking.
+        float  pitch = 1.15f + (0.25f * sinf(0.5f * s.time));
+        Camera cam   = camOrbit(make_float3(0.0f, 0.0f, 0.0f), 0.0f, pitch, 100.0f, 44.0f);
+        drawFrame(scr, cam, koi, pat, ui.seed, atlas);
 
         screenDownload(scr); //waits for GPU
         if(ui.shot){
