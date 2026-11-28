@@ -90,6 +90,10 @@ __host__ __device__ inline int cellFish(unsigned long long w){
     return (unsigned)w & 255;
 }
 
+__device__ inline float cellDepth(unsigned long long w){
+    return __uint_as_float((unsigned)(w >> 32));         // the high half, as the float it was
+}
+
 // Each koi's tail beat moves on with its speed: one beat per STRIDE koi
 // lengths travelled. The phase belongs to the koi, so fishId finds it.
 __global__ void k_phase(const float3* vel, const int* fishId, float* phase, int N, float dt){
@@ -132,6 +136,9 @@ __global__ void k_draw_fish(Screen sc, Camera cam, const KoiPoint* model, int nP
     if(!toCell(sc, cam, P, cx, cy, z)){
         return;
     }
+    if(m.part == P_EYE){                                 // so that an eye wins its cell
+        z -= 1.0f;
+    }
 
     // Light: Lambert, plus a rim where the skin turns away from the camera.
     float nv = -dot(N, cam.fwd);                         // 1 facing the camera, 0 edge-on
@@ -141,10 +148,45 @@ __global__ void k_draw_fish(Screen sc, Camera cam, const KoiPoint* model, int nP
     }
     float shade = 0.35f + (0.50f * fmaxf(dot(N, cam.light), 0.0f)) + (0.20f * powf(1.0f - nv, 3.0f));
 
+    // The look. A highlight where the skin mirrors the light into the camera;
+    // gold is metallic, so its highlight is three times as strong. Fins are
+    // darker, with three rays across each. And the deeper a koi swims, the
+    // darker it is.
+    int    col  = koiColor(m, pat, id, seed);
+    float3 half = normalize(cam.light - cam.fwd);        // halfway between the light and the camera
+    shade += ((col == C_GOLD) ? 0.90f : 0.30f) * powf(fmaxf(dot(N, half), 0.0f), 14.0f);
+    if(m.part != P_BODY && m.part != P_EYE){             // fins: darker, three rays across
+        shade *= 0.70f - (0.15f * cosf(18.85f * m.v));
+    }
+    shade *= 1.0f - (DEEP * (1.0f - (P.y / TANK_Y)));
     // Offer the point to its cell. The smallest word wins: the nearest point.
-    int col = koiColor(m, pat, id, seed);
     unsigned long long w = packCell(__float_as_uint(z), shade, m.part, col, id);
     atomicMin(&sc.depth[(cy * sc.cols) + cx], w);
+}
+
+__global__ void k_fade(Screen sc, float decay){
+    int cx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    int cy = (blockIdx.y * blockDim.y) + threadIdx.y;
+    if(cx >= sc.cols || cy >= sc.rows){
+        return;
+    }
+    int c = (cy * sc.cols) + cx;
+    sc.color[c] = sc.color[c] * decay;
+
+}
+
+// Is cell (x, y) a gap, seen from a koi cell at depth z that belongs to koi
+// `fish`? A gap is water, something much deeper, or another koi behind it.
+__device__ inline int gapAt(Screen sc, int x, int y, float z, int fish){
+    if(x < 0 || y < 0 || x >= sc.cols || y >= sc.rows){    // off the screen: no edge
+        return 0;
+    }
+    unsigned long long w = sc.depth[(y * sc.cols) + x];
+    if(w == EMPTY){
+        return 1;
+    }
+    float nz = cellDepth(w);
+    return (nz > (z + EDGE_Z)) || ((cellFish(w) != fish) && (nz > z));
 }
 
 __global__ void k_resolve_cells(Screen sc){
@@ -157,11 +199,40 @@ __global__ void k_resolve_cells(Screen sc){
     int c = (cy * sc.cols) + cx;
     unsigned long long w = sc.depth[c];
     if(w == EMPTY){
-        sc.glyph[c] = 0;
-        sc.color[c] = make_float3(0.0f, 0.0f, 0.0f);
+        float3 old = sc.color[c];                        // what a koi left here, dimmed by k_fade
+        float  top = fmaxf(old.x, fmaxf(old.y, old.z));
+        sc.glyph[c] = (top > 0.35f) ? 3 : ((top > 0.06f) ? 1 : 0);   // ':', then '.', then nothing
         return;
     }
-    float shade = cellShade(w);
-    sc.glyph[c] = (unsigned char)rampGlyph(shade);
-    sc.color[c] = koiPaint(cellColor(w)) * shade;
+    float shade = cellShade(w), z = cellDepth(w);
+    int   part = cellPart(w), col = cellColor(w), fish = cellFish(w);
+
+    //The letter: from the ramp by brightness, or an letter where the koi
+    // ends. gx and gyy say which side the gap is one: +1 right or below, -1 left
+    // or above, 0 neigher or both. An eye is an o.
+
+    int g = rampGlyph(shade);
+    int gx = gapAt(sc, cx + 1, cy, z, fish) - gapAt(sc, cx - 1, cy, z, fish);
+    int gy = gapAt(sc, cx, cy + 1, z, fish) - gapAt(sc, cx, cy - 1, z, fish);
+    const int EDGE[9] = {0, 3, 2,  1, -1, 1,  2, 4, 0};  // rows: gap above, none, below
+    int e = EDGE[((gy + 1) * 3) + gx + 1];
+    bool edge = e >= 0;
+    if(edge){
+        g = G_EDGE + e;
+    }
+    if(part == P_EYE){
+        g = G_BUBBLE;
+    }
+    sc.glyph[c] = (unsigned char)g;
+
+    // The color: paint times brightness; brightness above 1 is highlight.
+    float3 color = (koiPaint(col) * (0.35f + (0.65f * fminf(shade, 1.0f))))
+                 + (make_float3(1.0f, 0.95f, 0.8f) * fmaxf(shade - 1.0f, 0.0f));
+    if(edge){                                            // an edge letter has little ink
+        color = color * 1.6f;
+    }
+    if(edge && col == C_BLACK){                          // black: a blue rim
+        color += make_float3(0.05f, 0.12f, 0.25f);
+    }
+    sc.color[c] = color;
 }

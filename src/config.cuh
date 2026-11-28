@@ -69,3 +69,8 @@ constexpr float WIG_A  = 0.55f;     // tail swing of a koi at rest, world units
 constexpr float WIG_B  = 0.07f;     // extra swing per unit of speed
 constexpr float WIG_K  = 6.2832f;   // one full wave from snout to tail tip
 constexpr float STRIDE = 0.6f;      // koi lengths travelled per tail beat
+
+// The look of the pond.
+constexpr float EDGE_Z = 3.0f;      // a neighbor cell this much deeper counts as a gap
+constexpr float DEEP   = 0.65f;     // a koi at the bottom is this much darker than one at the top
+constexpr float FADE   = 0.88f;     // every frame a cell keeps this much of its color: short trails

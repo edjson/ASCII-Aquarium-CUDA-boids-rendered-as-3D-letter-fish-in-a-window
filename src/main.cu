@@ -86,6 +86,7 @@ static void sceneSeed(Sim& s, Patterns& pat, unsigned seed, bool show){
 // Everything the GPU draws in one frame, in order. 
 static void drawFrame(const Screen& scr, const Sim& s, const Camera& cam, const Model& koi,
                     const Patterns& pat, unsigned seed, const unsigned char* atlas){
+    k_fade<<<blocksFor(scr.cols, scr.rows), TILE>>>(scr, FADE);
     size_t cells = (size_t)scr.cols * scr.rows;          // every depth word to all ones: empty
     CUDA_CHECK(cudaMemset(scr.depth, 0xFF, cells * sizeof(unsigned long long)));
     k_draw_fish<<<dim3(s.N, (koi.n + 255) / 256), 256>>>(scr, cam, koi.pts, koi.n, pat, seed,
