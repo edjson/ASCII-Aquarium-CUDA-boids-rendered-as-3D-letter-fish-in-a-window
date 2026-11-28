@@ -9,12 +9,14 @@ constexpr int NBLOB = 8;             // blobs per koi, each a float4 {u, v, radi
 struct Patterns{
     float4 *blob;
     int *style;
+    float *phase;
 };
 
 static Patterns patternInit(int nFish){
     Patterns p{};
     CUDA_CHECK(cudaMalloc(&p.blob,  (size_t)nFish * NBLOB * sizeof(float4)));
     CUDA_CHECK(cudaMalloc(&p.style, (size_t)nFish * sizeof(int)));
+    CUDA_CHECK(cudaMalloc(&p.phase, (size_t)nFish * sizeof(float)));
     return p;
 }
 
@@ -34,6 +36,7 @@ __host__ __device__ inline float hash01(unsigned x){
 static void patternFree(Patterns& p){
     cudaFree(p.blob);
     cudaFree(p.style);
+    cudaFree(p.phase);
 }
 
 // Give every koi its variety and blobs, on the host, and upload them. Call
@@ -96,6 +99,7 @@ static void patternSeed(Patterns& p, int nFish, unsigned seed, bool inOrder){
     std::printf("\n");
     CUDA_CHECK(cudaMemcpy(p.blob,  hb.data(), hb.size() * sizeof(float4), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(p.style, hs.data(), hs.size() * sizeof(int),    cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemset(p.phase, 0, (size_t)nFish * sizeof(float)));   // tail beats start over
 }
 
 // Smooth noise from -1 to 1, two sine products: it makes a blob's edge ragged.

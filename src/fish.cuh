@@ -90,6 +90,17 @@ __host__ __device__ inline int cellFish(unsigned long long w){
     return (unsigned)w & 255;
 }
 
+// Each koi's tail beat moves on with its speed: one beat per STRIDE koi
+// lengths travelled. The phase belongs to the koi, so fishId finds it.
+__global__ void k_phase(const float3* vel, const int* fishId, float* phase, int N, float dt){
+    int k = (blockIdx.x * blockDim.x) + threadIdx.x;
+    if(k >= N){
+        return;
+    }
+
+    float ph = phase[fishId[k]] + (6.2831853f * length(vel[k]) * dt / (STRIDE * KOI_LEN));
+    phase[fishId[k]] = (ph < 6.2831853f) ? ph : (ph - 6.2831853f);   // keep it small
+}
 
 // One thread per model point per koi: block x is the koi's slot, block y and
 // thread x count the point. Move the point with its koi, find its cell, light
@@ -107,6 +118,8 @@ __global__ void k_draw_fish(Screen sc, Camera cam, const KoiPoint* model, int nP
     float    sp = length(v);
     float3   q  = m.p;                                   // the point, in the koi's own frame
 
+    float ph = pat.phase[id] +(6.2831853f * hash01((unsigned)id)) - (WIG_K * m.u);
+    q.z += (WIG_A + (WIG_B * sp)) * m.u * m.u * sinf(ph);
     // Turn: the koi's three axes from its velocity, then move it to its place.
     float3 f  = v * (1.0f / sp);                         // forward
     float3 r  = normalize(make_float3(-f.z, 0.0f, f.x)); // to its side, always level
@@ -120,11 +133,13 @@ __global__ void k_draw_fish(Screen sc, Camera cam, const KoiPoint* model, int nP
         return;
     }
 
-    // Light: Lambert. A point that faces away shows its other side.
-    if(dot(N, cam.fwd) > 0.0f){
-        N = N * -1.0f;
+    // Light: Lambert, plus a rim where the skin turns away from the camera.
+    float nv = -dot(N, cam.fwd);                         // 1 facing the camera, 0 edge-on
+    if(nv < 0.0f){                                       // it faces away: light its other side
+        N  = N * -1.0f;
+        nv = -nv;
     }
-    float shade = 0.35f + (0.50f * fmaxf(dot(N, cam.light), 0.0f));
+    float shade = 0.35f + (0.50f * fmaxf(dot(N, cam.light), 0.0f)) + (0.20f * powf(1.0f - nv, 3.0f));
 
     // Offer the point to its cell. The smallest word wins: the nearest point.
     int col = koiColor(m, pat, id, seed);

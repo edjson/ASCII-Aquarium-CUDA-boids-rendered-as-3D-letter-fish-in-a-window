@@ -63,3 +63,9 @@ constexpr float STEM_R  = 0.30f;    // radius of the tail stem, as a fraction of
 constexpr float CAM_FOV   = 0.5236f;    // 30 degrees
 constexpr float CAM_PITCH = 1.0472f;    // it looks down on the pond at 60 degrees
 constexpr float CAM_DIST  = 160.0f;     // from this far away, aimed at the pond's middle
+
+// Swimming: a wave runs down the body, one tail beat per STRIDE koi lengths.
+constexpr float WIG_A  = 0.55f;     // tail swing of a koi at rest, world units
+constexpr float WIG_B  = 0.07f;     // extra swing per unit of speed
+constexpr float WIG_K  = 6.2832f;   // one full wave from snout to tail tip
+constexpr float STRIDE = 0.6f;      // koi lengths travelled per tail beat

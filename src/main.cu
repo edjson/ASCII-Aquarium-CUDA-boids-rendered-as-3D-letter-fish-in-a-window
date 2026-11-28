@@ -129,6 +129,7 @@ static void runWindow(Sim& s, int W, int H, bool show){
             else{
                 simStep(s, dt);
             }
+            k_phase<<<(s.N + 255) / 256, 256>>>(s.vel, s.fishId, pat.phase, s.N, dt);
         }
 
         // The pond from above. With --show: close to the six posed koi, rocking.
