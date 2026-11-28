@@ -62,18 +62,40 @@ static void runBench(Sim& s){
 
 // the window: events, sim step, draw, copy to the host, show, 60 times a second.
 
+// Start, or restart, what the window shows: the boids and every koi's pattern.
+// With --show the koi are posed instead, in the middle of the pond: two columns
+// of three, level, heading +x. The boids never move them, so every run of
+// --show draws the same frames.
+
+static void sceneSeed(Sim& s, Patterns& pat, unsigned seed, bool show){
+    simSeed(s, seed);
+    patternSeed(pat, s.N, seed, show);
+    if(!show){
+        return;
+    }
+
+    std::vector<float3> hp(s.N), hv(s.N);
+    for(int k = 0; k < s.N; k++){
+        hp[k] = (s.tank * 0.5f) + make_float3(((k % 2) ? 6.6f : -6.6f), 0.0f, 7.2f - (7.2f * (k / 2)));
+        hv[k] = make_float3(CRUISE, 0.0f, 0.0f);
+    }
+    CUDA_CHECK(cudaMemcpy(s.pos, hp.data(), s.N * sizeof(float3), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(s.vel, hv.data(), s.N * sizeof(float3), cudaMemcpyHostToDevice));
+}
+
 // Everything the GPU draws in one frame, in order. 
-static void drawFrame(const Screen& scr, const Camera& cam, const Model& koi,
+static void drawFrame(const Screen& scr, const Sim& s, const Camera& cam, const Model& koi,
                     const Patterns& pat, unsigned seed, const unsigned char* atlas){
     size_t cells = (size_t)scr.cols * scr.rows;          // every depth word to all ones: empty
     CUDA_CHECK(cudaMemset(scr.depth, 0xFF, cells * sizeof(unsigned long long)));
-    k_draw_fish<<<dim3(6, (koi.n + 255) / 256), 256>>>(scr, cam, koi.pts, koi.n, pat, seed);
+    k_draw_fish<<<dim3(s.N, (koi.n + 255) / 256), 256>>>(scr, cam, koi.pts, koi.n, pat, seed,
+                                                         s.pos, s.vel, s.fishId);
     k_resolve_cells<<<blocksFor(scr.cols, scr.rows), TILE>>>(scr);
     k_rasterize<<<blocksFor(scr.W, scr.H), TILE>>>(scr, atlas);
     CUDA_CHECK(cudaGetLastError());
 }
 
-static void runWindow(Sim& s, int W, int H){
+static void runWindow(Sim& s, int W, int H, bool show){
     unsigned char* atlas = atlasUpload(atlasBake());
     Window win = winOpen(W, H);
 
@@ -82,11 +104,8 @@ static void runWindow(Sim& s, int W, int H){
     std::vector<KoiPoint> points = modelBuild(72, 64);   // the koi, built once on the host
     modelPrint(points);
     Model koi = modelUpload(points);
-    Patterns pat = patternInit(6);  //temp
-    patternSeed(pat, 6, 1u);
-    unsigned long long w = packCell(0x43030000u, 0.75f, 3, 2, 137);   // TEMP: check the layout
-    std::printf("cell %016llx: shade %.3f part %d color %d fish %d\n", w, cellShade(w), cellPart(w),
-                cellColor(w), cellFish(w));
+    Patterns pat = patternInit(s.N);               // one pattern and one tail beat per koi
+    sceneSeed(s, pat, 1u, show);
     const float zoom = (0.5f * H) / tanf(0.5f * CAM_FOV);   // the lens: pixels per unit at depth 1
     UI   ui;                       
     const float dt = 1.0f / 60.0f;             // one bench per frame 60 fps
@@ -100,17 +119,22 @@ static void runWindow(Sim& s, int W, int H){
         Uint64 t0 = SDL_GetPerformanceCounter();
         pollEvents(ui);
         if(ui.reseed){
-            simSeed(s, ui.seed);
-            patternSeed(pat, 6, ui.seed);
+            sceneSeed(s, pat, ui.seed, show);
             ui.reseed = false;
         }
         if(!ui.paused){
-            simStep(s, dt);
+            if(show){                             // posed koi: only the clock runs
+                s.time += dt;
+            }
+            else{
+                simStep(s, dt);
+            }
         }
-        // TEMP six koi around the origin, seen from above, rocking.
-        float  pitch = 1.15f + (0.25f * sinf(0.5f * s.time));
-        Camera cam   = camOrbit(make_float3(0.0f, 0.0f, 0.0f), 0.0f, pitch, 45.0f, zoom);
-        drawFrame(scr, cam, koi, pat, ui.seed, atlas);
+
+        // The pond from above. With --show: close to the six posed koi, rocking.
+        float  pitch = show ? (1.15f + (0.25f * sinf(0.5f * s.time))) : CAM_PITCH;
+        Camera cam   = camOrbit(s.tank * 0.5f, 0.0f, pitch, show ? 45.0f : CAM_DIST, zoom);
+        drawFrame(scr, s, cam, koi, pat, ui.seed, atlas);
 
         screenDownload(scr); //waits for GPU
         if(ui.shot){
@@ -152,7 +176,7 @@ static void runWindow(Sim& s, int W, int H){
 int main(int argc, char** argv){
     int nFish = DEFAULT_FISH;
     int W = 1280, H = 960;                          // --size WxH
-    bool bench = false, showAtlas = false;
+    bool bench = false, showAtlas = false, show = false;
 
     for(int i = 1; i < argc; i++){
         if(!std::strcmp(argv[i], "--bench")){
@@ -161,6 +185,11 @@ int main(int argc, char** argv){
         else if(!std::strcmp(argv[i], "--atlas")){
             showAtlas = true;
         }
+
+        else if(!std::strcmp(argv[i], "--show")){
+            show = true;
+        }
+
         else if(!std::strcmp(argv[i], "--fish")&& i + 1 < argc){
             nFish = std::atoi(argv[++i]);
         }
@@ -169,13 +198,18 @@ int main(int argc, char** argv){
                 i++;
         }
         else{
-            std::printf("usage: %s [--fish N] [--bench] [--size WxH] [--atlas]\n", argv[0]);
+            std::printf("usage: %s [--fish N] [--bench] [--size WxH] [--atlas] [--show]\n", argv[0]);
             return 1;
         }
     }
     if(nFish < 1){
         nFish =1;
     }
+
+    if(show){
+        nFish = 6;
+    }
+
     if(showAtlas){
         atlasPrint(atlasBake());
         return 0;
@@ -194,7 +228,7 @@ int main(int argc, char** argv){
         runBench(s);
     }
     else{
-        runWindow(s, W, H);
+        runWindow(s, W, H, show);
     }
     simFree(s);
     return 0;

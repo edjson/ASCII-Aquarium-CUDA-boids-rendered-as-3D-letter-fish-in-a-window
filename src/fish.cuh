@@ -3,7 +3,7 @@
 #include "pattern.cuh"
 
 // The camera: where it stands and its three axes, each of length 1. zoom is
-// the scale in pixels per world unit at depth 1. light points toward the
+// the scale in pixels per world unit. light points from the scene toward the
 // light; it is fixed in the world and rides along, so a kernel that gets the
 // camera has the light too. Step 7b rebuilds the camera from the mouse.
 struct Camera{
@@ -95,16 +95,24 @@ __host__ __device__ inline int cellFish(unsigned long long w){
 // thread x count the point. Move the point with its koi, find its cell, light
 // it, and offer it to the cell.
 __global__ void k_draw_fish(Screen sc, Camera cam, const KoiPoint* model, int nPts,
-                            Patterns pat, unsigned seed){
+                            Patterns pat, unsigned seed, const float3* pos, const float3* vel, const int* fishId){
     int k = blockIdx.x;                                  // this block's koi, by its slot
     int i = (blockIdx.y * blockDim.x) + threadIdx.x;     // this thread's model point
     if(i >= nPts){
         return;
     }
     KoiPoint m  = model[i];
-    int      id = k;                                     // TEMP the six posed koi again
-    float3   P  = m.p + make_float3(((k % 2) ? 6.6f : -6.6f), 0.0f, 7.2f - (7.2f * (k / 2)));
-    float3   N  = m.n;
+    int      id = fishId[k];                             // which koi is in slot k this frame
+    float3   v  = vel[k];
+    float    sp = length(v);
+    float3   q  = m.p;                                   // the point, in the koi's own frame
+
+    // Turn: the koi's three axes from its velocity, then move it to its place.
+    float3 f  = v * (1.0f / sp);                         // forward
+    float3 r  = normalize(make_float3(-f.z, 0.0f, f.x)); // to its side, always level
+    float3 up = cross(r, f);                             // up: at right angles to both
+    float3 P  = pos[k] + (f * q.x) + (up * q.y) + (r * q.z);
+    float3 N  = (f * m.n.x) + (up * m.n.y) + (r * m.n.z);
 
     int   cx, cy;                                        // the point's cell
     float z;                                             // and its depth

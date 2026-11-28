@@ -38,7 +38,7 @@ static void patternFree(Patterns& p){
 
 // Give every koi its variety and blobs, on the host, and upload them. Call
 // again to reseed. Prints how many blobs each of the first six koi got.
-static void patternSeed(Patterns& p, int nFish, unsigned seed){
+static void patternSeed(Patterns& p, int nFish, unsigned seed, bool inOrder){
     std::vector<float4> hb((size_t)nFish * NBLOB, make_float4(0, 0, 0, 0));   // radius 0: unused
     std::vector<int>    hs(nFish);                                            // host copy of style
     std::printf("seed %u blobs:", seed);
@@ -51,7 +51,7 @@ static void patternSeed(Patterns& p, int nFish, unsigned seed){
         auto pick = [&](int lo, int hi){
             return lo + (int)(rnd() * (hi - lo + 1));                     // lo..hi
         };
-        int kind = id % NKIND;       // TEMP (Step 5 picks at random): one koi of each variety
+        int kind = inOrder ? (id % NKIND) : (int)(rnd() * NKIND);   // one of each, or by chance
         int base = C_WHITE, fin = C_WHITE, n = 0;
         float4* b = &hb[(size_t)id * NBLOB];             // this koi's 8 blobs
 
